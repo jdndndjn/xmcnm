@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能控制面板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+html,body{width:100%;min-height:100vh;background:#1a0a18;color:#fff;padding:30px 20px;position:relative}
+
+/* 樱花背景 */
+.sakura{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;overflow:hidden;opacity:0.25}
+.petal{position:absolute;top:-10px;width:6px;height:6px;background:#ffc0e0;border-radius:50%}
+@keyframes fall{
+  0%{transform:translateY(-10px) rotate(0deg);opacity:1}
+  100%{transform:translateY(100vh) rotate(360deg);opacity:0}
+}
+
+/* 灵动岛 */
+.island{
+  position:fixed;top:12px;left:50%;transform:translateX(-50%) translateY(-120px);
+  width:150px;height:40px;background:#221122;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:0.4s cubic-bezier(0.25,0.8,0.25,1);z-index:9999;opacity:0;
+  box-shadow:0 6px 16px rgba(255,0,150,0.3);
+}
+.island.show{opacity:1;transform:translateX(-50%) translateY(0);}
+/* 只有成功时灵动岛变绿色 */
+.island.success{background:#22cc88;}
+.face{width:28px;height:28px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:bold;color:#000;font-size:16px;}
+.face.shake{animation:shakeFace 0.4s ease-in-out 2;}
+@keyframes shakeFace{
+  0%,100%{transform:rotate(0deg);}25%{transform:rotate(-15deg);}75%{transform:rotate(15deg);}
+}
+.island-msg{font-size:14px;color:#fff;font-weight:500;}
+
+.loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#1a0a18;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998}
+.loading h2{background:linear-gradient(90deg,#ff88cc,#ff55aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:30px;font-size:24px}
+.progress-box{width:280px;height:6px;background:#2d1a2b;border-radius:99px;overflow:hidden}
+.progress{width:0%;height:100%;background:linear-gradient(90deg,#ff88cc,#ff55aa);border-radius:99px;transition:width 0.3s ease}
+
+.page-loading{position:fixed;top:0;left:0;right:0;height:4px;background:#2d1a2b;z-index:999;display:none}
+.page-progress{height:100%;background:#ff88cc;width:0%;transition:width 1s}
+
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+.shake{animation:shake 0.2s ease-in-out}
+
+.card-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:998}
+.card-box{background:#221122;padding:30px;border-radius:16px;border:1px solid #ff55aa;width:90%;max-width:320px;text-align:center}
+.card-box h3{color:#ff88cc;margin-bottom:20px}
+#cardInput{width:100%;padding:12px 14px;background:#2d1a2b;border:1px solid #ff55aa;border-radius:10px;color:#fff;font-size:16px;margin-bottom:16px;outline:none}
+#cardInput.error{border-color:#ff4477}
+.confirm-btn{width:100%;padding:12px;background:#ff55aa;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:16px;
+box-shadow:0 0 12px rgba(255,85,170,0.4)}
+.confirm-btn:active{transform:scale(0.95)}
+.error-tip{color:#ff4477;font-size:14px;margin-top:-8px;margin-bottom:10px;display:none}
+
+.remember-row{display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:15px}
+#rememberPwd{transform:scale(1.2);margin-right:8px}
+
+.main{display:none}
+.title{text-align:center;font-size:32px;background:linear-gradient(90deg,#ff88cc,#ff55aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:30px}
+
+.menu{max-width:500px;margin:0 auto;display:flex;flex-direction:column;gap:18px;position:relative;z-index:1;
+animation: bounceIn 0.5s cubic-bezier(0.25, 1.1, 0.75, 1);
+}
+.btn{padding:22px 20px;border-radius:16px;background:linear-gradient(180deg,#2d1a2b,#221122);
+border:2px solid #ff55aa;text-align:center;font-size:20px;font-weight:bold;color:#fff;cursor:pointer;
+box-shadow:0 0 14px rgba(255,85,170,0.35)}
+.btn:active{transform:scale(0.95)}
+
+.page{
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  max-width:500px;
+  margin:0 auto;
+  position:relative;
+  z-index:1;
+}
+.page.show{
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  animation: bounceIn 0.5s cubic-bezier(0.25, 1.1, 0.75, 1);
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.back{padding:14px 22px;background:#221122;border:2px solid #ff55aa;color:#fff;border-radius:12px;cursor:pointer;margin-bottom:20px;font-size:18px;
+box-shadow:0 0 10px rgba(255,85,170,0.3)}
+.back:active{transform:scale(0.95)}
+
+.card{background:#221122;padding:24px;border-radius:20px;border:1px solid #ff55aa}
+.card h2{color:#ff88cc;margin-bottom:20px;text-align:center}
+.switch-item{display:flex;justify-content:space-between;align-items:center;padding:16px;background:#2d1a2b;border-radius:12px;margin-bottom:12px;cursor:pointer}
+.switch-item span{font-size:18px}
+.toggle{width:50px;height:24px;background:#442c40;border-radius:12px;position:relative}
+.toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:0.3s}
+.toggle.on{background:#ff55aa;box-shadow:0 0 8px rgba(255,85,170,0.5)}
+.toggle.on::after{left:28px}
+
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) scale(0.9);background:#ff55aa;color:#fff;padding:14px 24px;border-radius:12px;opacity:0;pointer-events:none;transition:0.4s;z-index:999;box-shadow:0 0 12px rgba(255,85,170,0.4)}
+.toast.show{opacity:1;transform:translateX(-50%) scale(1)}
+
+.center-check{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);width:70vw;height:70vw;background:#ff55aa;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:100px;z-index:9999;transition:transform 0.5s;box-shadow:0 0 30px rgba(255,85,170,0.5)}
+.center-check.show{transform:translate(-50%,-50%) scale(1)}
+
+.success-check{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);width:60vw;height:60vw;background:#ff55aa;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:80px;z-index:9999;transition:transform 0.5s;box-shadow:0 0 30px rgba(255,85,170,0.5)}
+.success-check.show{transform:translate(-50%,-50%) scale(1)}
+
+.range-modal{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.9);display:none;align-items:center;justify-content:center;z-index:9999
+}
+.range-box{
+  background:#221122;padding:30px;border-radius:16px;border:1px solid #ff55aa;
+  width:90%;max-width:320px;text-align:center;
+  animation: bounceIn 0.5s cubic-bezier(0.25, 1.1, 0.75, 1);
+}
+.range-box h3{color:#ff88cc;margin-bottom:20px}
+#rangeInput{
+  width:100%;padding:12px 14px;background:#2d1a2b;border:1px solid #ff55aa;
+  border-radius:10px;color:#fff;font-size:16px;margin-bottom:16px;outline:none
+}
+#rangeInput.error{border-color:#ff4477}
+.range-btn{
+  width:100%;padding:12px;background:#ff55aa;color:#fff;border:none;
+  border-radius:10px;cursor:pointer;font-size:16px;margin-top:10px;
+  box-shadow:0 0 12px rgba(255,85,170,0.4)
+}
+.range-btn:active{transform:scale(0.95)}
+.close-btn{
+  width:100%;padding:12px;background:#332230;color:#fff;border:none;
+  border-radius:10px;cursor:pointer;font-size:16px;margin-top:10px
+}
+
+.game-select{
+  display:none;
+  max-width:500px;
+  margin:0 auto;
+  animation: bounceIn 0.5s cubic-bezier(0.25, 1.1, 0.75, 1);
+}
+.game-select.show{
+  display:block;
+}
+</style>
+</head>
+<body>
+
+<!-- 樱花背景 -->
+<div class="sakura" id="sakura"></div>
+
+<!-- 灵动岛 -->
+<div class="island" id="island">
+  <div class="face" id="face">👤</div>
+  <div class="island-msg" id="islandMsg">验证中</div>
+</div>
+
+<div class="loading" id="loading">
+  <h2>系统启动中</h2>
+  <div class="progress-box">
+    <div class="progress" id="progress"></div>
+  </div>
+</div>
+
+<div class="page-loading" id="pageLoading"><div class="page-progress" id="pageProgress"></div></div>
+
+<div class="range-modal" id="rangeModal">
+  <div class="range-box">
+    <h3>设置范围pak</h3>
+    <p style="margin-bottom:16px;line-height:1.6">请输入 0.1 ~ 0.5 之间的数值</p>
+    <input type="number" id="rangeInput" placeholder="例如：0.2" step="0.1">
+    <button class="range-btn" onclick="submitRange()">确认</button>
+    <button class="close-btn" onclick="closeRangeModal()">取消</button>
+  </div>
+</div>
+
+<div class="card-modal" id="cardModal">
+  <div class="card-box">
+    <h3>验证权限</h3>
+    <input type="text" id="cardInput" placeholder="请输入密码">
+    <div class="remember-row">
+      <input type="checkbox" id="rememberPwd">
+      <label for="rememberPwd">保存密码</label>
+    </div>
+    <div class="error-tip" id="errorTip">密码错误，请重试</div>
+    <button class="confirm-btn" onclick="checkCard()">确认启动</button>
+  </div>
+</div>
+
+<div class="success-check" id="successCheck">✓</div>
+<div class="center-check" id="centerCheck">✓</div>
+<div class="toast" id="toast"></div>
+
+<div class="game-select" id="gameSelect">
+  <h1 class="title">选择游戏</h1>
+  <div class="menu">
+    <div class="btn" onclick="selectGame('三角洲行动')">三角洲行动</div>
+    <div class="btn" onclick="selectGame('和平精英')">和平精英</div>
+  </div>
+</div>
+
+<div class="main" id="main">  <h1 class="title" id="mainTitle">三角洲自动注入</h1>
+  <div class="menu" id="menu">
+    <div class="btn" onclick="go('p1')">保护账号</div>
+    <div class="btn" onclick="go('p2')">功能注入</div>
+    <div class="btn" onclick="go('p3')">联系开发者</div>
+  </div>
+</div>
+
+<div class="page" id="p1">
+  <button class="back" onclick="back()">返回</button>
+  <div class="card">
+    <h2>保护账号</h2>
+    <div class="switch-item" onclick="toggleProtect(this)"><span>登录保护</span><div class="toggle"></div></div>
+    <div class="switch-item" onclick="toggleProtect(this)"><span>大厅保护</span><div class="toggle"></div></div>
+  </div>
+</div>
+
+<div class="page" id="p2">
+  <button class="back" onclick="back()">返回</button>
+  <div class="card">
+    <h2>功能注入</h2>
+    <div id="tsItem" class="switch-item" onclick="toggleFunc(this)"><span>内透pak</span><div class="toggle"></div></div>
+    <div id="zzItem" class="switch-item" onclick="openRangeModal()"><span>范围pak</span><div class="toggle"></div></div>
+    <div class="switch-item" onclick="reset1()">
+      <span style="width:100%;text-align:center">还原内透</span>
+    </div>
+    <div class="switch-item" onclick="reset2()">
+      <span style="width:100%;text-align:center">还原范围</span>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="p3">
+  <button class="back" onclick="back()">返回</button>
+  <div class="card">
+    <h2>联系开发者</h2>
+    <div style="text-align:center;font-size:18px;line-height:1.8">
+      Dy小沐吃柠檬<br>
+      豆包大牛<br>
+      仅供娱乐<br>
+      请勿用于非法用途
+    </div>
+  </div>
+</div>
+
+<script>
+// 樱花飘落
+const sakura = document.getElementById('sakura');
+function createPetal(){
+  const p = document.createElement('div');
+  p.className = 'petal';
+  p.style.left = Math.random()*100 + 'vw';
+  p.style.animation = `fall ${3+Math.random()*4}s linear infinite`;
+  p.style.animationDelay = Math.random()*5 + 's';
+  sakura.appendChild(p);
+  setTimeout(()=>p.remove(),7000);
+}
+setInterval(createPetal,300);
+
+const loading = document.getElementById('loading');
+const progress = document.getElementById('progress');
+const main = document.getElementById('main');
+const mainTitle = document.getElementById('mainTitle');
+const cardModal = document.getElementById('cardModal');
+const cardInput = document.getElementById('cardInput');
+const rememberPwd = document.getElementById('rememberPwd');
+const errorTip = document.getElementById('errorTip');
+const pageLoading = document.getElementById('pageLoading');
+const pageProgress = document.getElementById('pageProgress');
+const toast = document.getElementById('toast');
+const centerCheck = document.getElementById('centerCheck');
+const successCheck = document.getElementById('successCheck');
+const menu = document.getElementById('menu');
+const tsItem = document.getElementById('tsItem');
+const zzItem = document.getElementById('zzItem');
+const rangeModal = document.getElementById('rangeModal');
+const rangeInput = document.getElementById('rangeInput');
+const gameSelect = document.getElementById('gameSelect');
+
+const island = document.getElementById('island');
+const face = document.getElementById('face');
+const islandMsg = document.getElementById('islandMsg');
+
+let currentPage = null;
+let timer1 = null, timer2 = null, timer3 = null, timer4 = null;
+let isLocked = false;
+let clickCount = 0;
+let clickWindow = 3000;
+let maxClicks = 10;
+
+function startLoading() {
+  let w = 0;
+  function update() {
+    w += 2;
+    progress.style.width = w + '%';
+    if (w >= 100) {
+      progress.style.width = '100%';
+      setTimeout(() => {
+        loading.style.display = 'none';
+        cardModal.style.display = 'flex';
+      }, 200);
+      return;
+    }
+    requestAnimationFrame(update);
+  }
+  update();}
+
+window.onload = function(){
+  const saved = localStorage.getItem('savedPwd');
+  if(saved){ cardInput.value = saved; rememberPwd.checked = true; }
+  setTimeout(startLoading, 500);
+}
+
+function checkFreq() {
+  if(isLocked)return true;
+  clickCount++;
+  const now = Date.now();
+  if(!window.lastClickTime || now-window.lastClickTime>clickWindow){ clickCount=1; window.lastClickTime=now; return false; }
+  if(clickCount>maxClicks){
+    abortAllTimers(); showIslandInfo("操作频繁"); isLocked=true;
+    setTimeout(()=>{isLocked=false;clickCount=0},1000); return true;
+  }
+  return false;
+}
+
+function abortAllTimers() {
+  clearTimeout(timer1);clearTimeout(timer2);clearTimeout(timer3);clearTimeout(timer4);
+  centerCheck.classList.remove('show'); successCheck.classList.remove('show');
+}
+
+// 成功时灵动岛绿色
+function showIslandSuccess(msg) {
+  island.classList.add('show','success');
+  face.textContent = '✓'; face.className = 'face';
+  islandMsg.textContent = msg;
+  navigator.vibrate?.(50);
+  setTimeout(()=>{ island.classList.remove('show','success'); },1400);
+}
+
+function showIslandInfo(msg) {
+  island.classList.add('show'); island.classList.remove('success');
+  face.textContent = 'ℹ️'; islandMsg.textContent = msg;
+  setTimeout(()=>{ island.classList.remove('show'); },1200);
+}
+
+function checkCard(){
+  if(checkFreq())return;
+  const v = cardInput.value.trim();
+  island.classList.add('show'); face.textContent = '👤'; face.className = 'face';
+  island.className = 'island show'; islandMsg.textContent = '验证中';
+
+  setTimeout(()=>{
+    if(v === 'XMNB666'){
+      island.classList.add('success'); islandMsg.textContent = '验证成功'; face.textContent = '✓';
+      navigator.vibrate?.(50);
+      setTimeout(()=>{
+        island.classList.remove('show');
+        if(rememberPwd.checked){ localStorage.setItem('savedPwd',v);
+        }else{ localStorage.removeItem('savedPwd'); }
+        cardModal.style.display='none';
+        successCheck.classList.add('show');
+        timer1=setTimeout(()=>{
+          showIslandSuccess('登录成功');
+          timer2=setTimeout(()=>{
+            successCheck.classList.remove('show');
+            gameSelect.classList.add('show');
+          },1000);
+        },200);
+      },1200);
+    }else{
+      islandMsg.textContent = '验证失败'; face.classList.add('shake');
+      navigator.vibrate?.(100); cardInput.classList.add('error','shake');
+      errorTip.style.display='block';
+      setTimeout(()=>cardInput.classList.remove('shake'),200);
+      setTimeout(()=>{ island.classList.remove('show'); },1200);
+    }
+  },400);}
+
+function selectGame(gameName){
+  if(checkFreq())return;
+  gameSelect.classList.remove('show');
+  pageLoading.style.display='block'; pageProgress.style.width='0%';
+  setTimeout(()=>{pageProgress.style.width='100%'},50);
+  setTimeout(()=>{
+    pageLoading.style.display='none';
+    showIslandSuccess(gameName+' 获取成功');
+    if(gameName==='和平精英'){
+      mainTitle.textContent='和平精英自动注入';
+    }else{
+      mainTitle.textContent='三角洲自动注入';
+    }
+    main.style.display='block';
+  },1000);
+}
+
+function go(id){
+  if(checkFreq())return;
+  menu.style.display='none';
+  pageLoading.style.display='block'; pageProgress.style.width='0%';
+  setTimeout(()=>{pageProgress.style.width='100%'},50);
+  timer3=setTimeout(()=>{
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+    document.getElementById(id).classList.add('show');
+    currentPage=id;
+    pageLoading.style.display='none';
+  },1000);
+}
+
+function back(){
+  if(checkFreq())return;
+  if(!currentPage)return;
+  document.getElementById(currentPage).classList.remove('show');
+  currentPage=null;
+  menu.style.display='flex';
+}
+
+function toggleProtect(el){
+  if(checkFreq())return;
+  const t=el.querySelector('.toggle');
+  const willOn=!t.classList.contains('on');
+  if(willOn){
+    t.classList.add('on'); showIslandInfo('等待1秒');
+    timer4=setTimeout(()=>{ showIslandSuccess('开启成功'); },1000);
+  }else{
+    el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),200);
+    showIslandInfo('无法关闭');
+  }
+}
+
+function toggleFunc(el){
+  if(checkFreq())return;
+  const t=el.querySelector('.toggle');
+  const isOn = t.classList.contains('on');
+  if(!isOn){
+    t.classList.add('on'); showIslandInfo('等待2秒');
+    timer4=setTimeout(()=>{ showIslandSuccess('开启成功'); },2000);
+  }else{
+    showIslandInfo('请点击下方对应按钮');
+    el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),200);
+  }
+}
+
+function openRangeModal(){
+  if(checkFreq())return;
+  rangeInput.value=''; rangeInput.classList.remove('error');
+  rangeModal.style.display='flex';
+}
+
+function closeRangeModal(){ rangeModal.style.display='none'; }
+
+function submitRange(){
+  if(checkFreq())return;
+  const val=parseFloat(rangeInput.value);
+  if(isNaN(val)||val<0.1||val>0.5){
+    rangeInput.classList.add('error','shake');
+    setTimeout(()=>rangeInput.classList.remove('shake'),200);
+    showIslandInfo('输入错误'); return;
+  }
+  closeRangeModal();
+  zzItem.querySelector('.toggle').classList.add('on');
+  showIslandInfo('处理中');
+  timer4=setTimeout(()=>{ showIslandSuccess('设置成功'); },1200);
+}
+
+function reset1(){
+  if(checkFreq())return;
+  showIslandInfo('等待1秒');
+  timer4=setTimeout(()=>{
+    tsItem.querySelector('.toggle').classList.remove('on');
+    showIslandSuccess('已还原');
+  },1000);
+}
+
+function reset2(){
+  if(checkFreq())return;
+  showIslandInfo('等待1秒');
+  timer4=setTimeout(()=>{
+    zzItem.querySelector('.toggle').classList.remove('on');
+    showIslandSuccess('已还原');
+  },1000);
+}
+</script>
+</body>
+</html>
+
